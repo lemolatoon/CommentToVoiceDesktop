@@ -9,7 +9,21 @@ function App() {
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
+    // setGreetMsg(await invoke("greet", { name }));
+    const content: string = await (async () => {
+      try {
+        return await invoke("getWavFile", {name});
+      } catch (e) {
+        let msg = "err";
+        if (e instanceof Error) {
+          msg = e.message;
+        } else if (typeof e === "string") {
+          msg = e;
+        }
+        return msg;
+      }
+    })();
+    setGreetMsg(content);
   }
 
   return (

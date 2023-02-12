@@ -6,6 +6,7 @@ version = 3
 name = "CommentToVoiceDesktop"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "openapi",
  "serde",
  "serde_json",
