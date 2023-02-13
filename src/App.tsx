@@ -33,18 +33,16 @@ function App() {
   const onSubmit = async () => {
     if (!sampleValue) return;
     const base64 = await getWavBase64String(sampleValue);
-    console.log(`bytes: ${base64}`);
     if (base64) {
       setBase64Uri(base64);
     }
-    console.log(`${sampleValue}, submitted`);
   };
 
   return (
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
       <FlexBox>
-        <Input value={sampleValue ?? ""} onChange={(e) => {setSampleValue(e.target.value); setBase64Uri(e.target.value)}} />
+        <Input value={sampleValue ?? ""} onChange={(e) => {setSampleValue(e.target.value);}} />
         <SubmitButton onClick={onSubmit}>
           submit
         </SubmitButton>
@@ -62,8 +60,6 @@ const useAudio = () => {
     if (audio) {
       return new Promise(async (resolve) => {
         audio.addEventListener("ended", () => resolve(true), {once: true});
-        console.log(`${audio.src ?? "null"}`);
-        console.log("play");
         await audio.play();
       }
       );
@@ -73,9 +69,7 @@ const useAudio = () => {
   }
 
   const setBase64Uri = (base64: string) => {
-    const audio = audioRef.current;
     // base64 => Data URI形式:
-    console.log(base64);
     const datauri = "data:audio/wav;base64," + base64;
     setUri(datauri);
   }
