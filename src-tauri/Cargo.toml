@@ -18,7 +18,9 @@ serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.2", features = ["dialog-message", "shell-open"] }
 anyhow = { version = "1.0" }
 once_cell = { version = "1.17" }
+base64 = "0.21.0"
 openapi = { path = "./openapi/" }
+
 
 [features]
 # by default Tauri runs in production mode

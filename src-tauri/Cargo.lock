@@ -7,6 +7,7 @@ name = "CommentToVoiceDesktop"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.0",
  "once_cell",
  "openapi",
  "serde",
@@ -1656,6 +1657,7 @@ dependencies = [
 name = "openapi"
 version = "0.14.0-preview.12"
 dependencies = [
+ "anyhow",
  "reqwest",
  "serde",
  "serde_derive",

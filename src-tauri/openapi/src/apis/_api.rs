@@ -1554,7 +1554,7 @@ pub async fn synthesis_synthesis_post(
     audio_query: crate::models::AudioQuery,
     enable_interrogative_upspeak: Option<bool>,
     core_version: Option<&str>,
-) -> Result<String, Error<SynthesisSynthesisPostError>> {
+) -> Result<Vec<u8>, anyhow::Error> {
     let local_var_configuration = configuration;
 
     let local_var_client = &local_var_configuration.client;
@@ -1582,12 +1582,11 @@ pub async fn synthesis_synthesis_post(
     let local_var_resp = local_var_client.execute(local_var_req).await?;
 
     let local_var_status = local_var_resp.status();
-    let local_var_content = local_var_resp.text().await?;
 
     if !local_var_status.is_client_error() && !local_var_status.is_server_error() {
-        return Ok(local_var_content);
-        serde_json::from_str(&local_var_content).map_err(Error::from)
+        return Ok(local_var_resp.bytes().await?.into_iter().collect());
     } else {
+        let local_var_content = local_var_resp.text().await?;
         let local_var_entity: Option<SynthesisSynthesisPostError> =
             serde_json::from_str(&local_var_content).ok();
         let local_var_error = ResponseContent {
@@ -1595,7 +1594,7 @@ pub async fn synthesis_synthesis_post(
             content: local_var_content,
             entity: local_var_entity,
         };
-        Err(Error::ResponseError(local_var_error))
+        Err(Error::ResponseError(local_var_error).into())
     }
 }
 
