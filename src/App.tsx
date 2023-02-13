@@ -10,9 +10,9 @@ function App() {
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     // setGreetMsg(await invoke("greet", { name }));
-    const content: string = await (async () => {
+    const content: string | null = await (async () => {
       try {
-        return await invoke("getWavFile", {name});
+        return await invoke("get_wav_byte_string", {text: name});
       } catch (e) {
         let msg = "err";
         if (e instanceof Error) {
@@ -20,10 +20,11 @@ function App() {
         } else if (typeof e === "string") {
           msg = e;
         }
-        return msg;
+        alert(msg);
+        return null;
       }
     })();
-    setGreetMsg(content);
+    content && setGreetMsg(content);
   }
 
   return (
