@@ -1,10 +1,16 @@
-# Tauri + React + Typescript
+# CommentToVoiceDesktop
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+## 開発環境構築
 
-## Recommended IDE Setup
+### VOICEVOX を立ち上げる
+```bash
+docker compose up -d
+```
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+### tauri を立ち上げる
+```bash
+yarn tauri dev
+```
 
 ## NOTE: open-api-generator
 
@@ -38,4 +44,5 @@ struct A {
         }
     }
 ```
-so, i manually fixed these kinds of codes
+so, i manually fixed these kinds of codes.
+Also, binary strings are tried to be converted into text by open api generator, so i fixed as they return ByteArray `Vec<u8>`
