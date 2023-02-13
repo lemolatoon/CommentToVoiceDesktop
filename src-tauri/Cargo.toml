@@ -15,7 +15,7 @@ tauri-build = { version = "1.2", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.2", features = ["shell-open"] }
+tauri = { version = "1.2", features = ["dialog-message", "shell-open"] }
 anyhow = { version = "1.0" }
 once_cell = { version = "1.17" }
 openapi = { path = "./openapi/" }

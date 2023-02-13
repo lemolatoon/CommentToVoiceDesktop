@@ -6,6 +6,7 @@
 use once_cell::sync::Lazy;
 use openapi::apis::_api as voicevox;
 use openapi::apis::configuration::Configuration;
+use serde::{Deserialize, Serialize};
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -19,12 +20,17 @@ const CONFIGURATION: Lazy<Configuration> = Lazy::new(|| Configuration {
     ..Default::default()
 });
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Bytes {
+    bytes: Vec<u8>,
+}
+
 #[tauri::command]
-async fn get_wav_byte_string(text: &str) -> Result<String, String> {
+async fn get_wav_byte_string(text: &str) -> Result<Bytes, String> {
     let result = async {
         let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, text, 1, None).await?;
         let wav = voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
-        Ok::<_, anyhow::Error>(wav)
+        Ok::<_, anyhow::Error>(Bytes { bytes: wav.into() })
     }
     .await;
     return result.map_err(|err| format!("{:?}", err));
