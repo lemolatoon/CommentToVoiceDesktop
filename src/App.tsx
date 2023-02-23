@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
 import styled from "styled-components";
 import { dialog } from "@tauri-apps/api";
+import { LiveChat } from "youtube-chat";
 
 const AppContainer = styled.div`
   display: flex;
@@ -16,20 +17,24 @@ const PlayButton = styled.button`
   height: 50px;
 `;
 
+const Input = styled.input``;
 const FlexBox = styled.div`
   display: flex;
   margin-top: 50px;
+  > ${Input} {
+    margin-left: 20px;
+  }
 `;
 
 const SubmitButton = styled.button`
   margin-left: 10px;
 `;
 
-const Input = styled.input``;
 
 function App() {
   const { audioRef, uri, play, setBase64Uri } = useAudio();
   const [sampleValue, setSampleValue] = useState<string | null>(null);
+  const [liveChatId, setLiveChatId] = useState<string | null>(null);
   const onSubmit = async () => {
     if (!sampleValue) return;
     const base64 = await getWavBase64String(sampleValue);
@@ -42,10 +47,15 @@ function App() {
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
       <FlexBox>
+        <div>sample text</div>
         <Input value={sampleValue ?? ""} onChange={(e) => {setSampleValue(e.target.value);}} />
         <SubmitButton onClick={onSubmit}>
           submit
         </SubmitButton>
+      </FlexBox>
+      <FlexBox>
+        <div>liveChatId</div>
+        <Input value={liveChatId ?? ""} onChange={(e) => {setLiveChatId(e.target.value);}} />
       </FlexBox>
       <PlayButton onClick={play}>play</PlayButton>
     </AppContainer>
