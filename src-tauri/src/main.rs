@@ -3,13 +3,20 @@
     windows_subsystem = "windows"
 )]
 
-use std::{fs, io::Write};
+use std::{
+    fs,
+    io::Write,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use base64::{engine::general_purpose, Engine as _};
 use once_cell::sync::Lazy;
 use openapi::apis::_api as voicevox;
 use openapi::apis::configuration::Configuration;
 use serde::{Deserialize, Serialize};
+use tauri::{Manager, State};
+use youtube_chat::live_chat::{Empty, InvokeOnChat, LiveChatClient, LiveChatClientBuilder};
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -41,11 +48,30 @@ async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
     return result.map_err(|err| format!("{:?}", err));
 }
 
+#[tauri::command]
+async fn update_client(window: tauri::Window, live_url: String) {
+    let app_handle = window.app_handle();
+    let mut client = LiveChatClientBuilder::new()
+        .url(live_url)
+        .unwrap()
+        .on_chat(move |chat_item| app_handle.emit_all("chat", chat_item).unwrap())
+        .build();
+    let handle = tauri::async_runtime::spawn(async move {
+        client.start().await.unwrap();
+        loop {
+            client.execute().await;
+            std::thread::sleep(Duration::from_secs(2));
+        }
+    });
+    window.listen_global("stop", move |_event| handle.abort());
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             greet,
-            get_wav_base64_encoded_string
+            get_wav_base64_encoded_string,
+            update_client
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

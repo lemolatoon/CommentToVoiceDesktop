@@ -3,18 +3,22 @@
 ## 開発環境構築
 
 ### VOICEVOX を立ち上げる
+
 ```bash
 docker compose up -d
 ```
 
 ### tauri を立ち上げる
+
 ```bash
 yarn tauri dev
 ```
 
 ## NOTE: open-api-generator
 
-In some `new` function, if you get `Option<T>` from function's params, and struct type is `Option<Box<T>>`, `open-api-generator` generates like:
+In some `new` function, if you get `Option<T>` from function's params, and
+struct type is `Option<Box<T>>`, `open-api-generator` generates like:
+
 ```rust
 struct A {
     ...
@@ -29,7 +33,9 @@ struct A {
         }
     }
 ```
+
 but correct generation is like:
+
 ```rust
 struct A {
     ...
@@ -44,5 +50,7 @@ struct A {
         }
     }
 ```
-so, i manually fixed these kinds of codes.
-Also, binary strings are tried to be converted into text by open api generator, so i fixed as they return ByteArray `Vec<u8>`
+
+so, i manually fixed these kinds of codes. Also, binary strings are tried to be
+converted into text by open api generator, so i fixed as they return ByteArray
+`Vec<u8>`
