@@ -5,7 +5,7 @@
 
 use std::{
     fs,
-    io::Write,
+    io::{self, Write},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -32,20 +32,40 @@ const CONFIGURATION: Lazy<Configuration> = Lazy::new(|| Configuration {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Encoded {
-    base64: String,
+    base64: Option<String>,
 }
 
-#[tauri::command]
+static IS_RUNNING: Mutex<()> = Mutex::new(());
+
 async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
+    let lock = IS_RUNNING.lock();
+    let mut running = match lock {
+        Ok(flag) => flag,
+        Err(_) => return Ok(Encoded { base64: None }),
+    };
     let result = async {
         let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, text, 1, None).await?;
         let wav = voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
         Ok::<_, anyhow::Error>(Encoded {
-            base64: general_purpose::STANDARD.encode(wav),
+            base64: Some(general_purpose::STANDARD.encode(wav)),
         })
     }
     .await;
     return result.map_err(|err| format!("{:?}", err));
+}
+
+#[tauri::command]
+fn write_answer(content: String) {
+    write_to_file("answer.txt", content).unwrap()
+}
+
+fn write_to_file(
+    file_name: impl AsRef<std::path::Path>,
+    content: impl AsRef<str>,
+) -> Result<(), io::Error> {
+    let mut file = fs::File::create(file_name)?;
+    file.write_all(content.as_ref().as_bytes())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -61,6 +81,8 @@ async fn update_client(window: tauri::Window, live_url: String) {
                 }
                 return None;
             }) {
+                println!("{}", &text);
+                write_to_file("question.txt", &text).unwrap();
                 app_handle.emit_all("chat", text).unwrap();
             }
         })
@@ -80,7 +102,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_wav_base64_encoded_string,
-            update_client
+            update_client,
+            write_answer
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

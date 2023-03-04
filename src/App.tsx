@@ -28,11 +28,13 @@ const SubmitButton = styled.button`
   margin-left: 10px;
 `;
 
+const write_answer = async (text: string) => {
+    await invoke("write_answer", { text });
+}
+
 
 function App() {
   const { audioRef, uri, play, setBase64Uri } = useAudio();
-  const [sampleValue, setSampleValue] = useState<string | null>(null);
-  const [liveChatId, setLiveChatId] = useState<string | null>(null);
   const speak = async (text: string) => {
     const base64 = await getWavBase64String(text);
     if (base64) {
@@ -40,8 +42,7 @@ function App() {
     }
     await play();
   }
-  const onSubmit = async () => {
-    if (!sampleValue) return;
+  const onSampleValueSubmit = async (sampleValue: string) => {
     const base64 = await getWavBase64String(sampleValue);
     if (base64) {
       setBase64Uri(base64);
@@ -53,8 +54,7 @@ function App() {
     speak(text);
   }
 
-  const onliveChatIdSubmit = async () => {
-    if (!liveChatId) return;
+  const onliveChatIdSubmit = async (liveChatId: string) => {
     const url = `https://www.youtube.com/watch?v=${liveChatId}`;
     await invoke("update_client", { liveUrl: url });
   };
@@ -79,8 +79,8 @@ function App() {
   return (
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
-      <SubmitValueBox name="sample text" value={sampleValue ?? ""} onSubmit={setSampleValue} />
-      <SubmitValueBox name="liveChatId" value={liveChatId ?? ""} onSubmit={setLiveChatId} />
+      <SubmitValueBox name="sample text" onSubmit={onSampleValueSubmit} />
+      <SubmitValueBox name="liveChatId"  onSubmit={onliveChatIdSubmit} />
       <PlayButton onClick={play}>play</PlayButton>
     </AppContainer>
   );
@@ -88,15 +88,14 @@ function App() {
 
 type SubmitValueBoxProps = {
   name: string,
-  value: string,
   onSubmit: (text: string) => void;
 }
-const SubmitValueBox = ({name, value, onSubmit}: SubmitValueBoxProps) => {
-  const [text, setText] = useState(value);
+const SubmitValueBox = ({name, onSubmit}: SubmitValueBoxProps) => {
+  const [text, setText] = useState("");
       return (<FlexBox>
         <div>{name}</div>
         <Input
-          value={value}
+          value={text}
           onChange={(e) => {
             setText(e.target.value);
           }}
@@ -135,7 +134,7 @@ async function getWavBase64String(text: string) {
   try {
     const { base64 } = await invoke("get_wav_base64_encoded_string", {
       text,
-    }) as { base64: string };
+    }) as { base64: string | null };
     return base64;
   } catch (e) {
     let msg = "err";
