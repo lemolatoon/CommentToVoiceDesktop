@@ -28,10 +28,18 @@ const SubmitButton = styled.button`
   margin-left: 10px;
 `;
 
+
 function App() {
   const { audioRef, uri, play, setBase64Uri } = useAudio();
   const [sampleValue, setSampleValue] = useState<string | null>(null);
   const [liveChatId, setLiveChatId] = useState<string | null>(null);
+  const speak = async (text: string) => {
+    const base64 = await getWavBase64String(text);
+    if (base64) {
+      setBase64Uri(base64);
+    }
+    await play();
+  }
   const onSubmit = async () => {
     if (!sampleValue) return;
     const base64 = await getWavBase64String(sampleValue);
@@ -39,6 +47,11 @@ function App() {
       setBase64Uri(base64);
     }
   };
+
+  const handleOnChat = (text: string) => {
+    console.log(`chat ${text} ${new Date()}`);
+    speak(text);
+  }
 
   const onliveChatIdSubmit = async () => {
     if (!liveChatId) return;
@@ -49,12 +62,10 @@ function App() {
     let unlisten: UnlistenFn | undefined = undefined;
     (async () => {
       unlisten = await listen("chat", (event) => {
-        try {
-          const payload: any = event.payload;
-          console.log(`chat ${payload.message[0].Text} ${new Date()}`);
-        } catch (e) {
-          console.log(e);
-        }
+          const payload: unknown = event.payload;
+          if (typeof payload === "string") {
+            handleOnChat(payload);
+          }
       });
     })();
 
@@ -68,33 +79,32 @@ function App() {
   return (
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
-      <FlexBox>
-        <div>sample text</div>
-        <Input
-          value={sampleValue ?? ""}
-          onChange={(e) => {
-            setSampleValue(e.target.value);
-          }}
-        />
-        <SubmitButton onClick={onSubmit}>
-          submit
-        </SubmitButton>
-      </FlexBox>
-      <FlexBox>
-        <div>liveChatId</div>
-        <Input
-          value={liveChatId ?? ""}
-          onChange={(e) => {
-            setLiveChatId(e.target.value);
-          }}
-        />
-        <SubmitButton onClick={onliveChatIdSubmit}>
-          submit
-        </SubmitButton>
-      </FlexBox>
+      <SubmitValueBox name="sample text" value={sampleValue ?? ""} onSubmit={setSampleValue} />
+      <SubmitValueBox name="liveChatId" value={liveChatId ?? ""} onSubmit={setLiveChatId} />
       <PlayButton onClick={play}>play</PlayButton>
     </AppContainer>
   );
+}
+
+type SubmitValueBoxProps = {
+  name: string,
+  value: string,
+  onSubmit: (text: string) => void;
+}
+const SubmitValueBox = ({name, value, onSubmit}: SubmitValueBoxProps) => {
+  const [text, setText] = useState(value);
+      return (<FlexBox>
+        <div>{name}</div>
+        <Input
+          value={value}
+          onChange={(e) => {
+            setText(e.target.value);
+          }}
+        />
+        <SubmitButton onClick={() => onSubmit(text)}>
+          submit
+        </SubmitButton>
+      </FlexBox>);
 }
 
 const useAudio = () => {

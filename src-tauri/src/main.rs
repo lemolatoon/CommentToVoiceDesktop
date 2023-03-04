@@ -15,8 +15,8 @@ use once_cell::sync::Lazy;
 use openapi::apis::_api as voicevox;
 use openapi::apis::configuration::Configuration;
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
-use youtube_chat::live_chat::{Empty, InvokeOnChat, LiveChatClient, LiveChatClientBuilder};
+use tauri::Manager;
+use youtube_chat::{item::MessageItem, live_chat::LiveChatClientBuilder};
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -54,7 +54,16 @@ async fn update_client(window: tauri::Window, live_url: String) {
     let mut client = LiveChatClientBuilder::new()
         .url(live_url)
         .unwrap()
-        .on_chat(move |chat_item| app_handle.emit_all("chat", chat_item).unwrap())
+        .on_chat(move |chat_item| {
+            if let Some(text) = chat_item.message.into_iter().next().and_then(|message| {
+                if let MessageItem::Text(message) = message {
+                    return Some(message);
+                }
+                return None;
+            }) {
+                app_handle.emit_all("chat", text).unwrap();
+            }
+        })
         .build();
     let handle = tauri::async_runtime::spawn(async move {
         client.start().await.unwrap();
