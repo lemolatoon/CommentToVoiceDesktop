@@ -9,6 +9,13 @@ use std::{
     time::Duration,
 };
 
+use async_openai::{
+    types::{
+        ChatCompletionRequestMessage, ChatCompletionRequestMessageArgs,
+        CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
+    },
+    Client as OpenaiClient,
+};
 use base64::{engine::general_purpose, Engine as _};
 use once_cell::sync::Lazy;
 use openapi::apis::_api as voicevox;
@@ -16,6 +23,7 @@ use openapi::apis::configuration::Configuration;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use youtube_chat::{item::MessageItem, live_chat::LiveChatClientBuilder};
+use CommentToVoiceDesktop::boundedqueue::BoundedQueue;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -33,36 +41,6 @@ const CONFIGURATION: Lazy<Configuration> = Lazy::new(|| Configuration {
 struct Encoded {
     base64: Option<String>,
 }
-
-// use std::future::Future;
-// use std::pin::Pin;
-// static F: Lazy<
-//     tauri::async_runtime::Mutex<
-//         Pin<
-//             Box<
-//                 dyn Fn(
-//                         String,
-//                     )
-//                         -> Pin<Box<dyn Future<Output = Result<Encoded, anyhow::Error>> + Send>>
-//                     + Send,
-//             >,
-//         >,
-//     >,
-// > = Lazy::new(|| {
-//     tauri::async_runtime::Mutex::new(Box::pin(|text: String| {
-//         Box::pin(async move {
-//             println!("GENERATING...:{}", text);
-//             let query =
-//                 voicevox::audio_query_audio_query_post(&CONFIGURATION, &text, 1, None).await?;
-//             let wav =
-//                 voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
-//             let result = Ok::<_, anyhow::Error>(Encoded {
-//                 base64: Some(general_purpose::STANDARD.encode(wav)),
-//             });
-//             result
-//         })
-//     }))
-// });
 
 static LOCK: Lazy<tauri::async_runtime::Mutex<()>> =
     Lazy::new(|| tauri::async_runtime::Mutex::new(()));
@@ -130,6 +108,25 @@ async fn update_client(window: tauri::Window, live_url: String) {
     window.app_handle().listen_global("stop", move |_event| {
         handle.abort();
     });
+}
+
+const SYSTEM_MESSAGE_PROMPT: Lazy<ChatCompletionRequestMessage> =
+    Lazy::new(|| ChatCompletionRequestMessage {
+        role: async_openai::types::Role::System,
+        content: r#"あなたはライブ配信をしているAI配信者です。"#.to_string(),
+        name: None,
+    });
+
+#[tauri::command]
+async fn gen_reply(question: String) -> Result<String, anyhow::Error> {
+    let client = OpenaiClient::new();
+
+    let reqest = CreateChatCompletionRequestArgs::default()
+        .model("gpt-3.5-turbo")
+        .messages(vec![SYSTEM_MESSAGE_PROMPT.to_owned()])
+        .build()?;
+    let response = client.chat().create(reqest).await?;
+    todo!()
 }
 
 fn main() {
