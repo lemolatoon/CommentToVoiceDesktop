@@ -21,6 +21,7 @@ once_cell = { version = "1.17" }
 base64 = "0.21.0"
 openapi = { path = "./openapi/" }
 youtube_chat = "0.1.4"
+parking_lot = "0.12.1"
 
 
 [features]

@@ -10,6 +10,7 @@ dependencies = [
  "base64 0.21.0",
  "once_cell",
  "openapi",
+ "parking_lot",
  "serde",
  "serde_json",
  "tauri",
