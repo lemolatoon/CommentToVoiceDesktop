@@ -6,14 +6,12 @@
 use std::{
     fs,
     io::{self, Write},
+    sync::Mutex,
     time::Duration,
 };
 
 use async_openai::{
-    types::{
-        ChatCompletionRequestMessage, ChatCompletionRequestMessageArgs,
-        CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
-    },
+    types::{ChatCompletionRequestMessage, CreateChatCompletionRequestArgs},
     Client as OpenaiClient,
 };
 use base64::{engine::general_purpose, Engine as _};
@@ -117,16 +115,64 @@ const SYSTEM_MESSAGE_PROMPT: Lazy<ChatCompletionRequestMessage> =
         name: None,
     });
 
-#[tauri::command]
-async fn gen_reply(question: String) -> Result<String, anyhow::Error> {
-    let client = OpenaiClient::new();
+const QUEUE_SIZE: usize = 10; // > 0
+static CHAT_PAST_QUEUE: Lazy<
+    Mutex<BoundedQueue<Option<ChatCompletionRequestMessage>, QUEUE_SIZE>>,
+> = Lazy::new(|| Mutex::new(BoundedQueue::new(None).unwrap()));
 
-    let reqest = CreateChatCompletionRequestArgs::default()
-        .model("gpt-3.5-turbo")
-        .messages(vec![SYSTEM_MESSAGE_PROMPT.to_owned()])
-        .build()?;
-    let response = client.chat().create(reqest).await?;
-    todo!()
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Generated {
+    generated: String,
+}
+
+#[tauri::command]
+async fn gen_reply(question: String) -> Result<Generated, String> {
+    let result: Result<Generated, anyhow::Error> = async {
+        let client = OpenaiClient::new();
+        let messages: Vec<ChatCompletionRequestMessage> = {
+            let chat_queue = CHAT_PAST_QUEUE.lock().unwrap();
+            vec![SYSTEM_MESSAGE_PROMPT.to_owned()]
+                .into_iter()
+                .chain((*chat_queue).clone().into_iter().filter_map(|item| item))
+                .chain(
+                    vec![ChatCompletionRequestMessage {
+                        role: async_openai::types::Role::User,
+                        content: question,
+                        name: None,
+                    }]
+                    .into_iter(),
+                )
+                .collect()
+        };
+        let reqest = CreateChatCompletionRequestArgs::default()
+            .model("gpt-3.5-turbo")
+            .messages(messages)
+            .build()?;
+        let response = client.chat().create(reqest).await?;
+        let choice = response
+            .choices
+            .into_iter()
+            .next()
+            .map(|choice| choice.message);
+        let response_message = choice
+            .as_ref()
+            .and_then(|choice| Some(choice.content.clone()))
+            .unwrap_or_else(|| "".to_string());
+        let pushing = choice.map(|content| ChatCompletionRequestMessage {
+            role: content.role,
+            content: content.content,
+            name: None,
+        });
+        {
+            let mut chat_queue = CHAT_PAST_QUEUE.lock().unwrap();
+            (*chat_queue).push(pushing);
+        }
+        Ok(Generated {
+            generated: response_message,
+        })
+    }
+    .await;
+    return result.map_err(|err| format!("{:?}", err));
 }
 
 fn main() {
@@ -137,6 +183,7 @@ fn main() {
             update_client,
             write_answer,
             stop_client,
+            gen_reply,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

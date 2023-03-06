@@ -29,3 +29,13 @@ impl<T, const N: usize> BoundedQueue<T, N> {
         a.iter().chain(b.iter())
     }
 }
+
+impl<T, const N: usize> IntoIterator for BoundedQueue<T, N> {
+    type Item = T;
+
+    type IntoIter = <VecDeque<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
