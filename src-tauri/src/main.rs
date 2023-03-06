@@ -3,6 +3,8 @@
     windows_subsystem = "windows"
 )]
 
+use dotenv::dotenv;
+
 use std::{
     fs,
     io::{self, Write},
@@ -111,11 +113,19 @@ async fn update_client(window: tauri::Window, live_url: String) {
 const SYSTEM_MESSAGE_PROMPT: Lazy<ChatCompletionRequestMessage> =
     Lazy::new(|| ChatCompletionRequestMessage {
         role: async_openai::types::Role::System,
-        content: r#"あなたはライブ配信をしているAI配信者です。"#.to_string(),
+        content: r#"あなたはライブ配信をしているAI配信者です。以下にあなたの設定を書きます。
+ - 名前は「みかえか」
+ - 語尾は「なんですよ」
+ - 関西弁を話す。
+ - 敬語は使わない。
+
+上の設定をもとにして雑談配信をしてください。関西弁を使うことを忘れないでください。
+"#
+        .to_string(),
         name: None,
     });
 
-const QUEUE_SIZE: usize = 10; // > 0
+const QUEUE_SIZE: usize = 5; // > 0
 static CHAT_PAST_QUEUE: Lazy<
     Mutex<BoundedQueue<Option<ChatCompletionRequestMessage>, QUEUE_SIZE>>,
 > = Lazy::new(|| Mutex::new(BoundedQueue::new(None).unwrap()));
@@ -125,23 +135,24 @@ struct Generated {
     generated: String,
 }
 
+static API_KEY: Mutex<Option<String>> = Mutex::new(None);
+
 #[tauri::command]
 async fn gen_reply(question: String) -> Result<Generated, String> {
+    println!("gen_reply: {}", &question);
     let result: Result<Generated, anyhow::Error> = async {
         let client = OpenaiClient::new();
+        let posting = ChatCompletionRequestMessage {
+            role: async_openai::types::Role::User,
+            content: question,
+            name: None,
+        };
         let messages: Vec<ChatCompletionRequestMessage> = {
             let chat_queue = CHAT_PAST_QUEUE.lock().unwrap();
             vec![SYSTEM_MESSAGE_PROMPT.to_owned()]
                 .into_iter()
                 .chain((*chat_queue).clone().into_iter().filter_map(|item| item))
-                .chain(
-                    vec![ChatCompletionRequestMessage {
-                        role: async_openai::types::Role::User,
-                        content: question,
-                        name: None,
-                    }]
-                    .into_iter(),
-                )
+                .chain(vec![posting.clone()].into_iter())
                 .collect()
         };
         let reqest = CreateChatCompletionRequestArgs::default()
@@ -165,6 +176,7 @@ async fn gen_reply(question: String) -> Result<Generated, String> {
         });
         {
             let mut chat_queue = CHAT_PAST_QUEUE.lock().unwrap();
+            (*chat_queue).push(Some(posting));
             (*chat_queue).push(pushing);
         }
         Ok(Generated {
@@ -172,10 +184,16 @@ async fn gen_reply(question: String) -> Result<Generated, String> {
         })
     }
     .await;
+    if let Err(err) = &result {
+        eprintln!("{:?}", err);
+    } else {
+        println!("gened: {}", result.as_ref().unwrap().generated);
+    }
     return result.map_err(|err| format!("{:?}", err));
 }
 
 fn main() {
+    dotenv().ok();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             greet,

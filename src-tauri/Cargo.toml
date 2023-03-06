@@ -23,6 +23,7 @@ openapi = { path = "./openapi/" }
 youtube_chat = "0.1.4"
 parking_lot = "0.12.1"
 async-openai = "0.9.2"
+dotenv = "0.15.0"
 
 
 [features]

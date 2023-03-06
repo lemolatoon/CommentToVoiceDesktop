@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import styled from "styled-components";
 import { listen, UnlistenFn, emit } from "@tauri-apps/api/event";
+import { Replies, Reply, useReplies } from "./components/Replies";
 
 const AppContainer = styled.div`
   display: flex;
@@ -34,6 +35,7 @@ const write_answer = async (text: string) => {
 
 function App() {
   const { isPlayingRef, audioRef, uri, play, setBase64Uri } = useAudio();
+  const { replies, push_reply } = useReplies();
   const [reading, setReading] = useState("");
   const speak = async (text: string) => {
     const base64 = await getWavBase64String(text);
@@ -77,15 +79,25 @@ function App() {
     };
   }, []);
 
+  const onUserChat = async (message: string) => {
+    const reply = await gen_reply(message);
+    if (reply) {
+      push_reply({ role: "user", content: message });
+      push_reply(reply);
+    }
+  };
+
   return (
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
       <SubmitValueBox name="sample text" onSubmit={onSampleValueSubmit} />
       <SubmitValueBox name="liveChatId" onSubmit={onliveChatIdSubmit} />
+      <SubmitValueBox name="chat" onSubmit={onUserChat} />
       <Button onClick={play}>play</Button>
       <Button onClick={() => emit("stop")}>stop</Button>
       <div>NOW READING...: {reading}</div>
       <div>{`isPlaying: ${isPlayingRef.current}`}</div>
+      <Replies replies={replies} />
     </AppContainer>
   );
 }
@@ -147,6 +159,20 @@ const useAudio = () => {
 
   return { isPlayingRef, uri, audioRef, play, setBase64Uri };
 };
+
+async function gen_reply(message: string): Promise<Reply | null> {
+  try {
+    const reply = (await invoke("gen_reply", { question: message })) as {
+      generated: string;
+    };
+    return { role: "ai", content: reply.generated };
+  } catch (e) {
+    if (e instanceof Error) {
+      console.error(e.message);
+    }
+    return null;
+  }
+}
 
 async function getWavBase64String(text: string) {
   console.log(`getWavBase64String for ${text}`);
