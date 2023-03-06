@@ -35,15 +35,19 @@ const write_answer = async (text: string) => {
 
 function App() {
   const { audioRef, uri, play, setBase64Uri } = useAudio();
+  const [reading, setReading] = useState("");
   const speak = async (text: string) => {
+    console.log(`speak ${text}`);
     const base64 = await getWavBase64String(text);
     if (base64) {
+      setReading(text);
       setBase64Uri(base64);
     }
-    await play();
+    if (audioRef.current?.paused) await play();
   }
   const onSampleValueSubmit = async (sampleValue: string) => {
     const base64 = await getWavBase64String(sampleValue);
+    console.log(base64);
     if (base64) {
       setBase64Uri(base64);
     }
@@ -82,6 +86,7 @@ function App() {
       <SubmitValueBox name="sample text" onSubmit={onSampleValueSubmit} />
       <SubmitValueBox name="liveChatId"  onSubmit={onliveChatIdSubmit} />
       <PlayButton onClick={play}>play</PlayButton>
+      <div>NOW READING...: {reading}</div>
     </AppContainer>
   );
 }
@@ -110,12 +115,10 @@ const useAudio = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [uri, setUri] = useState<string | null>(null);
   const play = () => {
+    console.log("play");
     const audio = audioRef.current;
     if (audio) {
-      return new Promise(async (resolve) => {
-        audio.addEventListener("ended", () => resolve(true), { once: true });
-        await audio.play();
-      });
+      audio.play();
     } else {
       throw new Error("audioRef is null");
     }

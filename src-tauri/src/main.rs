@@ -6,9 +6,10 @@
 use std::{
     fs,
     io::{self, Write},
-    sync::{Arc, Mutex},
     time::Duration,
 };
+
+use std::sync::Mutex;
 
 use base64::{engine::general_purpose, Engine as _};
 use once_cell::sync::Lazy;
@@ -35,24 +36,35 @@ struct Encoded {
     base64: Option<String>,
 }
 
-static IS_RUNNING: Mutex<()> = Mutex::new(());
+static IS_RUNNING: Mutex<bool> = Mutex::new(false);
 
+#[tauri::command]
 async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
-    let lock = IS_RUNNING.lock();
-    let mut running = match lock {
-        Ok(flag) => flag,
-        Err(_) => return Ok(Encoded { base64: None }),
-    };
     let result = async {
+        {
+            let mut lock = IS_RUNNING.lock().unwrap();
+            if *lock {
+                return Ok(Encoded { base64: None });
+            };
+            *lock = true;
+        }
+        println!("GENERATING...:{}", text);
         let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, text, 1, None).await?;
         let wav = voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
-        Ok::<_, anyhow::Error>(Encoded {
+        let result = Ok::<_, anyhow::Error>(Encoded {
             base64: Some(general_purpose::STANDARD.encode(wav)),
-        })
+        });
+        {
+            let mut lock = IS_RUNNING.lock().unwrap();
+            *lock = false;
+        }
+        result
     }
     .await;
     return result.map_err(|err| format!("{:?}", err));
+
 }
+
 
 #[tauri::command]
 fn write_answer(content: String) {
@@ -103,7 +115,7 @@ fn main() {
             greet,
             get_wav_base64_encoded_string,
             update_client,
-            write_answer
+            write_answer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
