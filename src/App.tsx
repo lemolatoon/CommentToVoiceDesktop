@@ -38,28 +38,31 @@ function App() {
   const { replies, push_reply } = useReplies();
   const [reading, setReading] = useState("");
   const speak = async (text: string) => {
-    const base64 = await getWavBase64String(text);
+    const base64 = await getWavBase64String(text, 3);
     if (base64 && !isPlayingRef.current) {
       setReading(text);
       setBase64Uri(base64);
     }
     setTimeout(() => {
       if (audioRef.current?.paused && !isPlayingRef.current) {
+        write_answer(text);
         play();
       }
     }, 0);
   };
   const onSampleValueSubmit = async (sampleValue: string) => {
-    const base64 = await getWavBase64String(sampleValue);
+    const base64 = await getWavBase64String(sampleValue, 1);
     console.log(base64);
     if (base64) {
       setBase64Uri(base64);
     }
   };
 
-  const handleOnChat = (text: string) => {
+  const handleOnChat = async (text: string) => {
     console.log(`chat ${text} ${new Date()}`);
-    speak(text);
+    const reply = await gen_reply(text);
+    if (!reply) return;
+    await speak(`「${text}」\n${reply.content}`);
   };
 
   const onliveChatIdSubmit = async (liveChatId: string) => {
@@ -161,12 +164,13 @@ const useAudio = () => {
 };
 
 async function gen_reply(message: string): Promise<Reply | null> {
+  return {role: "ai", content: "test by ai"};
   try {
     const reply = (await invoke("gen_reply", { question: message })) as {
       generated: string;
     };
     return { role: "ai", content: reply.generated };
-  } catch (e) {
+  } catch (e: unknown) {
     if (e instanceof Error) {
       console.error(e.message);
     }
@@ -174,11 +178,12 @@ async function gen_reply(message: string): Promise<Reply | null> {
   }
 }
 
-async function getWavBase64String(text: string) {
+async function getWavBase64String(text: string, speaker: number) {
   console.log(`getWavBase64String for ${text}`);
   try {
     const { base64 } = (await invoke("get_wav_base64_encoded_string", {
       text,
+      speaker,
     })) as { base64: string | null };
     return base64;
   } catch (e) {

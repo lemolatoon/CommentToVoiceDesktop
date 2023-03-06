@@ -45,11 +45,12 @@ struct Encoded {
 static LOCK: Lazy<tauri::async_runtime::Mutex<()>> =
     Lazy::new(|| tauri::async_runtime::Mutex::new(()));
 #[tauri::command]
-async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
+async fn get_wav_base64_encoded_string(text: &str, speaker: i32) -> Result<Encoded, String> {
     let lock = LOCK.lock().await;
     let result = async {
         println!("GENERATING...:{}", text);
-        let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, &text, 1, None).await?;
+        let query =
+            voicevox::audio_query_audio_query_post(&CONFIGURATION, &text, speaker, None).await?;
         let wav = voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
         let result = Ok::<_, anyhow::Error>(Encoded {
             base64: Some(general_purpose::STANDARD.encode(wav)),
@@ -62,8 +63,8 @@ async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
 }
 
 #[tauri::command]
-fn write_answer(content: String) {
-    write_to_file("../answer.txt", content).unwrap()
+fn write_answer(text: String) {
+    write_to_file("../answer.txt", text).unwrap()
 }
 
 fn write_to_file(
@@ -118,6 +119,7 @@ const SYSTEM_MESSAGE_PROMPT: Lazy<ChatCompletionRequestMessage> =
  - 語尾は「なんですよ」
  - 関西弁を話す。
  - 敬語は使わない。
+ - 一人称は「オレ」
 
 上の設定をもとにして雑談配信をしてください。関西弁を使うことを忘れないでください。
 "#
