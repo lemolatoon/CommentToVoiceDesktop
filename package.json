@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "generate": "yarn openapi-generator-cli generate -i openapi.json -g rust -o ./src-tauri/openapi",
-    "setup": "yarn generate"
+    "setup": "yarn generate",
+    "fmt:nofix": "yarn prettier src/**/*.{ts,tsx,json}",
+    "fmt": "yarn fmt:nofix --write"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.2.0",
@@ -25,6 +27,7 @@
     "@types/react-dom": "^18.0.6",
     "@types/styled-components": "^5.1.26",
     "@vitejs/plugin-react": "^3.0.0",
+    "prettier": "^2.8.4",
     "typescript": "^4.6.4",
     "vite": "^4.0.0"
   }
