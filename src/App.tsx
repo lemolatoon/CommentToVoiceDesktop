@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import styled from "styled-components";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, UnlistenFn, emit } from "@tauri-apps/api/event";
 
 const AppContainer = styled.div`
   display: flex;
@@ -9,7 +9,7 @@ const AppContainer = styled.div`
   align-items: center;
 `;
 
-const PlayButton = styled.button`
+const Button = styled.button`
   margin-top: 50px;
   width: 100px;
   height: 50px;
@@ -34,16 +34,17 @@ const write_answer = async (text: string) => {
 
 
 function App() {
-  const { audioRef, uri, play, setBase64Uri } = useAudio();
+  const { isPlayingRef,audioRef, uri, play, setBase64Uri } = useAudio();
   const [reading, setReading] = useState("");
   const speak = async (text: string) => {
-    console.log(`speak ${text}`);
     const base64 = await getWavBase64String(text);
-    if (base64) {
+    if (base64 && !isPlayingRef.current) {
       setReading(text);
       setBase64Uri(base64);
     }
-    if (audioRef.current?.paused) await play();
+    setTimeout(() => {
+      if (audioRef.current?.paused && !isPlayingRef.current) { play();} }
+      , 0);
   }
   const onSampleValueSubmit = async (sampleValue: string) => {
     const base64 = await getWavBase64String(sampleValue);
@@ -63,30 +64,30 @@ function App() {
     await invoke("update_client", { liveUrl: url });
   };
   useEffect(() => {
-    let unlisten: UnlistenFn | undefined = undefined;
-    (async () => {
-      unlisten = await listen("chat", (event) => {
+    let unlisten: Promise<UnlistenFn> = 
+      listen("chat", (event) => {
           const payload: unknown = event.payload;
           if (typeof payload === "string") {
             handleOnChat(payload);
           }
       });
-    })();
 
     return () => {
-      if (unlisten) {
-        unlisten();
-      }
+      unlisten.then(f => f());
     };
   }, []);
+
+
 
   return (
     <AppContainer>
       <audio controls src={uri ?? ""} ref={audioRef}></audio>
       <SubmitValueBox name="sample text" onSubmit={onSampleValueSubmit} />
       <SubmitValueBox name="liveChatId"  onSubmit={onliveChatIdSubmit} />
-      <PlayButton onClick={play}>play</PlayButton>
+      <Button onClick={play}>play</Button>
+      <Button onClick={() => emit("stop")}>stop</Button>
       <div>NOW READING...: {reading}</div>
+      <div>{`isPlaying: ${isPlayingRef.current}`}</div>
     </AppContainer>
   );
 }
@@ -113,11 +114,25 @@ const SubmitValueBox = ({name, onSubmit}: SubmitValueBoxProps) => {
 
 const useAudio = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef<boolean>(false);
   const [uri, setUri] = useState<string | null>(null);
-  const play = () => {
-    console.log("play");
+  const [isPlaying, setIsPlaying] = useState(false);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying])
+  useEffect(() => {
     const audio = audioRef.current;
+    function setIsPlayingFalse() {setIsPlaying(false);}
     if (audio) {
+      audio.addEventListener("ended", setIsPlayingFalse);
+      return () => audio.removeEventListener("ended", setIsPlayingFalse);
+    }
+  }, [audioRef.current])
+
+  const play = () => {
+    const audio = audioRef.current;
+    if (audio && !isPlaying) {
+      setIsPlaying(true);
       audio.play();
     } else {
       throw new Error("audioRef is null");
@@ -130,10 +145,11 @@ const useAudio = () => {
     setUri(datauri);
   };
 
-  return { uri, audioRef, play, setBase64Uri };
+  return { isPlayingRef ,uri, audioRef, play, setBase64Uri };
 };
 
 async function getWavBase64String(text: string) {
+  console.log(`getWavBase64String for ${text}`);
   try {
     const { base64 } = await invoke("get_wav_base64_encoded_string", {
       text,

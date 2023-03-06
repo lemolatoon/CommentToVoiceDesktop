@@ -9,8 +9,6 @@ use std::{
     time::Duration,
 };
 
-use std::sync::Mutex;
-
 use base64::{engine::general_purpose, Engine as _};
 use once_cell::sync::Lazy;
 use openapi::apis::_api as voicevox;
@@ -36,39 +34,58 @@ struct Encoded {
     base64: Option<String>,
 }
 
-static IS_RUNNING: Mutex<bool> = Mutex::new(false);
+// use std::future::Future;
+// use std::pin::Pin;
+// static F: Lazy<
+//     tauri::async_runtime::Mutex<
+//         Pin<
+//             Box<
+//                 dyn Fn(
+//                         String,
+//                     )
+//                         -> Pin<Box<dyn Future<Output = Result<Encoded, anyhow::Error>> + Send>>
+//                     + Send,
+//             >,
+//         >,
+//     >,
+// > = Lazy::new(|| {
+//     tauri::async_runtime::Mutex::new(Box::pin(|text: String| {
+//         Box::pin(async move {
+//             println!("GENERATING...:{}", text);
+//             let query =
+//                 voicevox::audio_query_audio_query_post(&CONFIGURATION, &text, 1, None).await?;
+//             let wav =
+//                 voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
+//             let result = Ok::<_, anyhow::Error>(Encoded {
+//                 base64: Some(general_purpose::STANDARD.encode(wav)),
+//             });
+//             result
+//         })
+//     }))
+// });
 
+static LOCK: Lazy<tauri::async_runtime::Mutex<()>> =
+    Lazy::new(|| tauri::async_runtime::Mutex::new(()));
 #[tauri::command]
 async fn get_wav_base64_encoded_string(text: &str) -> Result<Encoded, String> {
+    let lock = LOCK.lock().await;
     let result = async {
-        {
-            let mut lock = IS_RUNNING.lock().unwrap();
-            if *lock {
-                return Ok(Encoded { base64: None });
-            };
-            *lock = true;
-        }
         println!("GENERATING...:{}", text);
-        let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, text, 1, None).await?;
+        let query = voicevox::audio_query_audio_query_post(&CONFIGURATION, &text, 1, None).await?;
         let wav = voicevox::synthesis_synthesis_post(&CONFIGURATION, 1, query, None, None).await?;
         let result = Ok::<_, anyhow::Error>(Encoded {
             base64: Some(general_purpose::STANDARD.encode(wav)),
         });
-        {
-            let mut lock = IS_RUNNING.lock().unwrap();
-            *lock = false;
-        }
         result
     }
     .await;
+    let _ = lock;
     return result.map_err(|err| format!("{:?}", err));
-
 }
-
 
 #[tauri::command]
 fn write_answer(content: String) {
-    write_to_file("answer.txt", content).unwrap()
+    write_to_file("../answer.txt", content).unwrap()
 }
 
 fn write_to_file(
@@ -78,6 +95,10 @@ fn write_to_file(
     let mut file = fs::File::create(file_name)?;
     file.write_all(content.as_ref().as_bytes())?;
     Ok(())
+}
+#[tauri::command]
+async fn stop_client(window: tauri::Window) {
+    window.emit("stop", "").unwrap();
 }
 
 #[tauri::command]
@@ -94,7 +115,7 @@ async fn update_client(window: tauri::Window, live_url: String) {
                 return None;
             }) {
                 println!("{}", &text);
-                write_to_file("question.txt", &text).unwrap();
+                write_to_file("../question.txt", &text).unwrap();
                 app_handle.emit_all("chat", text).unwrap();
             }
         })
@@ -106,7 +127,9 @@ async fn update_client(window: tauri::Window, live_url: String) {
             std::thread::sleep(Duration::from_secs(2));
         }
     });
-    window.listen_global("stop", move |_event| handle.abort());
+    window.app_handle().listen_global("stop", move |_event| {
+        handle.abort();
+    });
 }
 
 fn main() {
@@ -116,6 +139,7 @@ fn main() {
             get_wav_base64_encoded_string,
             update_client,
             write_answer,
+            stop_client,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
