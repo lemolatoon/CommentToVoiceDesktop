@@ -164,7 +164,6 @@ const useAudio = () => {
 };
 
 async function gen_reply(message: string): Promise<Reply | null> {
-  return {role: "ai", content: "test by ai"};
   try {
     const reply = (await invoke("gen_reply", { question: message })) as {
       generated: string;
