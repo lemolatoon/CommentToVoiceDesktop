@@ -26,3 +26,6 @@ dist-ssr
 
 answer.txt
 question.txt
+
+# executables
+*.exe
